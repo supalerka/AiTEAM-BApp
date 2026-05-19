@@ -405,25 +405,27 @@ function UserManagementPage({ currentProfile }) {
     if (!form.full_name) { setError("กรุณากรอกชื่อ"); return; }
     if (!form.role) { setError("กรุณาเลือก Role"); return; }
     setSaving(true); setError("");
-    const token = sb.auth.getSession()?.access_token || SUPABASE_ANON_KEY;
-    // Supabase admin invite — ส่ง magic link ไปยัง email ของผู้ใช้ใหม่
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
+    // เรียกผ่าน Netlify function เพราะต้องใช้ SUPABASE_SERVICE_ROLE_KEY (admin key)
+    // ไม่สามารถเรียก Supabase /auth/v1/invite จาก frontend ได้โดยตรง
+    const res = await fetch("/api/invite", {
       method: "POST",
-      headers: { ...sb.h(token), "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email: form.email,
-        data: { full_name: form.full_name, role: form.role, position: form.position || "" },
+        full_name: form.full_name,
+        role: form.role,
+        position: form.position || "",
       }),
     });
     const d = await res.json();
     setSaving(false);
-    if (res.ok) {
+    if (res.ok && d.success) {
       setModal(null);
       setSavedMsg(`ส่งคำเชิญไปที่ ${form.email} แล้ว ✓`);
       setTimeout(() => setSavedMsg(""), 4000);
       load();
     } else {
-      setError(d.msg || d.message || "ส่งคำเชิญไม่สำเร็จ กรุณาตรวจสอบว่า Supabase เปิดใช้งาน Email Invites");
+      setError(d.error || "ส่งคำเชิญไม่สำเร็จ");
     }
   };
 
@@ -4838,9 +4840,11 @@ function ReceiptForm({ doc, onBack }) {
       });
     }
     if (!doc?.id && !header.doc_number) {
-      const recType = doc?._convertFromINV?.invoice_number_type === "invoice_product" ? "receipt_product" : "receipt_service";
+      // TX prefix → RS (receipt_product), IV prefix → RE (receipt_service)
+      const invDocNum = doc?._convertFromINV?.doc_number || "";
+      const recType = invDocNum.startsWith("TX") ? "receipt_product" : "receipt_service";
       previewNextDocNumber(recType).then(num => {
-        if (num) setHeader(h => ({ ...h, doc_number: num, receipt_number_type: recType, _docNumberPreview: true }));
+        if (num) setHeader(h => ({ ...h, doc_number: num, receipt_number_type: recType, doc_type: recType, _docNumberPreview: true }));
       });
     }
     if (doc?.id) {
@@ -4859,8 +4863,12 @@ function ReceiptForm({ doc, onBack }) {
     if (!inv) return;
     const remaining = (parseFloat(inv.total) || 0) - (parseFloat(inv.paid_amount) || 0);
     const isPart = inv.status === "partial";
+    // TX prefix → RS (receipt_product), IV prefix → RE (receipt_service)
+    const invDocNum = inv.doc_number || "";
+    const recType = invDocNum.startsWith("TX") ? "receipt_product" : "receipt_service";
     setHeader(h => ({
       ...h, invoice_id: inv.id, invoice_number: inv.doc_number,
+      receipt_number_type: recType, doc_type: recType,
       customer_id: inv.customer_id, customer_name: inv.customer_name,
       customer_address: inv.customer_address || "", customer_tax_id: inv.customer_tax_id || "",
       customer_contact: inv.customer_contact || "", customer_phone: inv.customer_phone || "",
@@ -4870,6 +4878,12 @@ function ReceiptForm({ doc, onBack }) {
       vat_percent: inv.vat_percent,
       note: stripDocMeta(inv.note) || "",
     }));
+    // อัพเดทเลขที่เอกสารให้ตรงกับประเภทใหม่
+    if (!doc?.id) {
+      previewNextDocNumber(recType).then(num => {
+        if (num) setHeader(h => ({ ...h, doc_number: num, _docNumberPreview: true }));
+      });
+    }
     const res = await fetch(`${SUPABASE_URL}/rest/v1/invoice_items?invoice_id=eq.${invId}&order=item_order.asc&select=*`, {
       headers: sb.h()
     });
