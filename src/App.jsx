@@ -51,10 +51,27 @@ const sb = (() => {
       });
       return r.ok ? { error: null } : { error: await r.json() };
     },
+    refresh: async () => {
+      try {
+        const s = localStorage.getItem("sb_session");
+        if (!s) return false;
+        const session = JSON.parse(s);
+        if (!session.refresh_token) return false;
+        const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
+          body: JSON.stringify({ refresh_token: session.refresh_token }),
+        });
+        const d = await r.json();
+        if (r.ok && d.access_token) { localStorage.setItem("sb_session", JSON.stringify(d)); return true; }
+        localStorage.removeItem("sb_session");
+        return false;
+      } catch { return false; }
+    },
   };
 
   const db = {
-    list: async (table, search = "", searchCols = []) => {
+    list: async (table, search = "", searchCols = [], limit = 1000) => {
       const baseTable = table.split("?")[0];
       const noOrder = ["company_settings"].includes(baseTable);
       let url = `${SUPABASE_URL}/rest/v1/${baseTable}?select=*`;
@@ -63,6 +80,7 @@ const sb = (() => {
         const q = searchCols.map(c => `${c}.ilike.*${search}*`).join(",");
         url += `&or=(${q})`;
       }
+      url += `&limit=${limit}`;
       const r = await fetch(url, { headers: base(getToken()) });
       return r.ok ? await r.json() : [];
     },
@@ -840,11 +858,16 @@ function DashboardHome({ userName: name = "ผู้ใช้งาน" }) {
         const sData = await sRes.json();
         if (Array.isArray(sData) && sData.length > 0) setStats(sData[0]);
 
-        // Recent documents (last 5 each)
+        // Recent documents + monthly chart — fetch only last 6 months
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        const dateFrom = sixMonthsAgo.toISOString().split("T")[0];
+        const tok = sb.auth.getSession()?.access_token;
+        const hh = sb.h(tok);
         const [qts, invs, recs] = await Promise.all([
-          sb.db.list("quotations"),
-          sb.db.list("invoices"),
-          sb.db.list("receipts"),
+          fetch(`${SUPABASE_URL}/rest/v1/quotations?select=*&order=created_at.desc&limit=50`, { headers: hh }).then(r => r.json()).catch(() => []),
+          fetch(`${SUPABASE_URL}/rest/v1/invoices?select=*&order=doc_date.desc&doc_date=gte.${dateFrom}`, { headers: hh }).then(r => r.json()).catch(() => []),
+          fetch(`${SUPABASE_URL}/rest/v1/receipts?select=*&order=doc_date.desc&doc_date=gte.${dateFrom}`, { headers: hh }).then(r => r.json()).catch(() => []),
         ]);
         const allDocs = [
           ...(qts || []).slice(0, 3).map(d => ({ ...d, _type: "quotation" })),
@@ -4829,7 +4852,7 @@ function ReceiptForm({ doc, onBack }) {
       const token = sb.auth.getSession()?.access_token || SUPABASE_ANON_KEY;
       const hdrs = sb.h(token);
       const [invData, recData] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/invoices?select=*&order=created_at.desc`, { headers: hdrs }).then(r => r.json()),
+        fetch(`${SUPABASE_URL}/rest/v1/invoices?select=*&order=created_at.desc&limit=1000`, { headers: hdrs }).then(r => r.json()),
         fetch(`${SUPABASE_URL}/rest/v1/receipts?select=invoice_id,total,subtotal,vat_amount&status=neq.cancelled`, { headers: hdrs }).then(r => r.json()),
       ]);
       const recByInv = {};
@@ -6922,6 +6945,25 @@ export default function App() {
     }, 60000); // ทุก 60 วินาที
     return () => clearInterval(interval);
   }, [session, handleLogout]);
+
+  // Auto-refresh JWT ก่อนหมดอายุ (Supabase token expire ทุก 1 ชั่วโมง)
+  useEffect(() => {
+    if (!session) return;
+    const checkAndRefresh = async () => {
+      const s = sb.auth.getSession();
+      if (!s?.expires_at) return;
+      const secondsLeft = s.expires_at - Math.floor(Date.now() / 1000);
+      if (secondsLeft < 300) {
+        const ok = await sb.auth.refresh();
+        if (ok) setSession(sb.auth.getSession());
+        else handleLogout();
+      }
+    };
+    checkAndRefresh();
+    const interval = setInterval(checkAndRefresh, 60000);
+    return () => clearInterval(interval);
+  }, [session, handleLogout]);
+
   // Force re-render เมื่อ permissions เปลี่ยน (เช่น หลัง admin save สิทธิ์)
   const [, forceUpdate] = useState(0);
   useEffect(() => {
