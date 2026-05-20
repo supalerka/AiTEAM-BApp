@@ -3,7 +3,7 @@
 ## วิธีอัปเดต App
 1. copy `App2_fixed.jsx` จาก bizsystem-dev มาวางที่ `src/App.jsx`
 2. push ขึ้น GitHub
-3. Cloudflare Pages / Vercel deploy อัตโนมัติ
+3. Cloudflare Pages / Netlify / Vercel deploy อัตโนมัติ
 
 ## การตั้งค่า Environment Variables
 ตั้งค่าใน Cloudflare Pages หรือ Vercel dashboard:
