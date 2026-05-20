@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
-const SUPABASE_URL = "https://byprrxqoxxomoffweftu.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5cHJyeHFveHhvbW9mZndlZnR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1NjAzNzksImV4cCI6MjA5NDEzNjM3OX0.D0k3R0VOJzMECsKfvBzXVFXnNBBaNfNCiOHrsZp5uHM";
-
 
 // ─── SUPABASE CLIENT ──────────────────────────────────────────────────────────
 const sb = (() => {
@@ -5799,7 +5797,7 @@ function ChatbotPage() {
       const reply = data.content?.[0]?.text || "ขออภัย ไม่สามารถตอบได้ในขณะนี้";
       setMessages(prev => [...prev, { role: "assistant", content: reply }]);
     } catch (err) {
-      setMessages(prev => [...prev, { role: "assistant", content: `⚠️ ไม่สามารถเชื่อมต่อ AI ได้: ${err.message}\n\nกรุณาตรวจสอบว่าตั้งค่า ANTHROPIC_API_KEY ใน Netlify Environment Variables แล้ว` }]);
+      setMessages(prev => [...prev, { role: "assistant", content: `⚠️ ไม่สามารถเชื่อมต่อ AI ได้: ${err.message}\n\nกรุณาตรวจสอบว่าตั้งค่า GEMINI_API_KEY ใน Netlify Environment Variables แล้ว` }]);
     }
     setLoading(false);
   };
