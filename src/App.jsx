@@ -617,8 +617,8 @@ User จะถูก logout ออกจากระบบทันทีเม�
                   </tbody>
                 </table>
           }
-          <div style={{ marginTop: 16, padding: "12px 16px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, fontSize: 12, color: "#92400e" }}>
-            {"💡 เพิ่ม user ใหม่: Supabase → Authentication → Users → Add user → กรอก email + password แล้วรัน SQL insert ใน user_profiles"}
+          <div style={{ marginTop: 16, padding: "12px 16px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, fontSize: 12, color: "#1e40af", lineHeight: 1.7 }}>
+            {"💡 เพิ่มผู้ใช้ใหม่: กดปุ่ม \"✉️ เชิญผู้ใช้ใหม่\" — ระบบส่งอีเมลให้ผู้ใช้ตั้งรหัสผ่านเอง ชื่อและ Role จะแสดงในรายการนี้ทันทีหลังส่งคำเชิญ"}
           </div>
         </div>
       )}
@@ -1097,6 +1097,9 @@ function CustomerListPage({ onOpenDetail, readOnly }) {
     setDeactivateId(null); load();
   };
   const { sorted: sortedRows, Th: SortTh } = useSortable(rows, "code", "asc");
+  const [pg, setPg] = useState(1);
+  useEffect(() => setPg(1), [search, showInactive]);
+  const pageRows = sortedRows.slice((pg - 1) * PAGE_SIZE, pg * PAGE_SIZE);
 
   return (
     <div>
@@ -1133,7 +1136,7 @@ function CustomerListPage({ onOpenDetail, readOnly }) {
                 </tr>
               </thead>
               <tbody>
-                {sortedRows.map(row => (
+                {pageRows.map(row => (
                   <tr key={row.id} onMouseEnter={e => e.currentTarget.style.background = "#f8f9fa"} onMouseLeave={e => e.currentTarget.style.background = ""}>
                     <td style={S.td}><span style={{ fontWeight: 500, color: "#0F6E56" }}>{row.code}</span></td>
                     <td style={S.td}>
@@ -1159,6 +1162,7 @@ function CustomerListPage({ onOpenDetail, readOnly }) {
               </tbody>
             </table>
           )}
+        <Pagination total={sortedRows.length} page={pg} onChange={setPg} />
       </div>
 
       {modal && (
@@ -2072,6 +2076,9 @@ function ProductServicePage({ type, readOnly }) {
     return true;
   });
   const { sorted: filtered, Th: SortTh } = useSortable(filteredRaw, "code", "asc");
+  const [pg, setPg] = useState(1);
+  useEffect(() => setPg(1), [search, filterTag, filterPriceMin, filterPriceMax, type]);
+  const pageRows = filtered.slice((pg - 1) * PAGE_SIZE, pg * PAGE_SIZE);
 
   const openAdd = () => {
     // auto-generate next code: P#### for products, S#### for services
@@ -2210,7 +2217,7 @@ function ProductServicePage({ type, readOnly }) {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(row => (
+                {pageRows.map(row => (
                   <tr key={row.id} onMouseEnter={e => e.currentTarget.style.background = "#f8f9fa"} onMouseLeave={e => e.currentTarget.style.background = ""}>
                     <td style={S.td}><span style={{ fontWeight: 500, color: "#0F6E56", fontSize: 12 }}>{row.code}</span></td>
                     <td style={S.td}>
@@ -2250,6 +2257,7 @@ function ProductServicePage({ type, readOnly }) {
               </tbody>
             </table>
           )}
+        <Pagination total={filtered.length} page={pg} onChange={setPg} />
       </div>
 
       {/* Form Modal */}
@@ -2459,6 +2467,40 @@ function useSortable(data, defaultKey = "created_at", defaultDir = "desc") {
   return { sorted, sortKey, sortDir, toggleSort, Th };
 }
 
+// ─── PAGINATION ───────────────────────────────────────────────────────────────
+const PAGE_SIZE = 20;
+function Pagination({ total, page, onChange }) {
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  if (totalPages <= 1) return null;
+  const btn = (label, target, disabled, active = false) => (
+    <button key={`${label}-${target}`} onClick={() => !disabled && onChange(target)} disabled={disabled}
+      style={{ padding: "5px 10px", minWidth: 34, borderRadius: 6, border: "1.5px solid",
+        fontSize: 12, cursor: disabled ? "not-allowed" : "pointer", fontWeight: active ? 700 : 400,
+        background: active ? "#0F6E56" : "#fff", borderColor: active ? "#0F6E56" : "#dee2e6",
+        color: active ? "#fff" : disabled ? "#dee2e6" : "#495057" }}>
+      {label}
+    </button>
+  );
+  const from = (page - 1) * PAGE_SIZE + 1;
+  const to = Math.min(page * PAGE_SIZE, total);
+  const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+  const end = Math.min(totalPages, start + 4);
+  const pages = [];
+  for (let i = start; i <= end; i++) pages.push(i);
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14, paddingTop: 12, borderTop: "1px solid #f1f3f5" }}>
+      <div style={{ fontSize: 12, color: "#6c757d" }}>แสดง {from}–{to} จาก {total} รายการ</div>
+      <div style={{ display: "flex", gap: 4 }}>
+        {btn("«", 1, page === 1)}
+        {btn("‹", page - 1, page === 1)}
+        {pages.map(p => btn(p, p, false, p === page))}
+        {btn("›", page + 1, page === totalPages)}
+        {btn("»", totalPages, page === totalPages)}
+      </div>
+    </div>
+  );
+}
+
 // ─── DOCUMENT FILTER BAR ──────────────────────────────────────────────────────
 function DocFilterBar({ filters, onChange, statusOptions, showCustomer = true, customers = [] }) {
   const now = new Date();
@@ -2626,6 +2668,9 @@ function QuotationList({ onNew, onEdit, onConvertToInvoice, refreshKey }) {
   const statusLabel = { draft: { label: "ร่าง", color: "gray" }, sent: { label: "ส่งแล้ว", color: "blue" }, approved: { label: "อนุมัติ", color: "green" }, cancelled: { label: "ยกเลิก", color: "red" } };
   const filtered = applyDocFilters(rows, filters, customers);
   const { sorted: sortedRows, Th: SortTh } = useSortable(filtered, "doc_date", "desc");
+  const [pg, setPg] = useState(1);
+  useEffect(() => setPg(1), [search, filters]);
+  const pageRows = sortedRows.slice((pg - 1) * PAGE_SIZE, pg * PAGE_SIZE);
 
   return (
     <div>
@@ -2660,7 +2705,7 @@ function QuotationList({ onNew, onEdit, onConvertToInvoice, refreshKey }) {
                 </tr>
               </thead>
               <tbody>
-                {sortedRows.map(r => {
+                {pageRows.map(r => {
                   const st = statusLabel[r.status] || statusLabel.draft;
                   return (
                     <tr key={r.id} onMouseEnter={e => e.currentTarget.style.background = "#f8f9fa"} onMouseLeave={e => e.currentTarget.style.background = ""}>
@@ -2692,6 +2737,7 @@ function QuotationList({ onNew, onEdit, onConvertToInvoice, refreshKey }) {
               </tbody>
             </table>
           )}
+        <Pagination total={sortedRows.length} page={pg} onChange={setPg} />
       </div>
     </div>
   );
@@ -3782,6 +3828,9 @@ function InvoiceList({ onNew, onEdit, onConvertToReceipt }) {
 
   const filtered = applyDocFilters(rows, filters, customers);
   const { sorted: sortedRows, Th: SortTh } = useSortable(filtered, "doc_date", "desc");
+  const [pg, setPg] = useState(1);
+  useEffect(() => setPg(1), [search, filters]);
+  const pageRows = sortedRows.slice((pg - 1) * PAGE_SIZE, pg * PAGE_SIZE);
 
   return (
     <div>
@@ -3821,7 +3870,7 @@ function InvoiceList({ onNew, onEdit, onConvertToReceipt }) {
                 </tr>
               </thead>
               <tbody>
-                {sortedRows.map(r => {
+                {pageRows.map(r => {
                   const dt = DOC_TYPES[r.doc_type] || DOC_TYPES.invoice;
                   const st = STATUS_INV[r.status] || STATUS_INV.draft;
                   return (
@@ -3885,6 +3934,7 @@ function InvoiceList({ onNew, onEdit, onConvertToReceipt }) {
               </tbody>
             </table>
           )}
+        <Pagination total={sortedRows.length} page={pg} onChange={setPg} />
       </div>
       {receiptPopup && <InvoiceReceiptList invoiceId={receiptPopup} onClose={() => setReceiptPopup(null)} />}
     </div>
@@ -4628,6 +4678,9 @@ function ReceiptList({ onNew, onEdit }) {
 
   const filtered = applyDocFilters(rows, filters, customers);
   const { sorted: sortedRows, Th: SortTh } = useSortable(filtered, "doc_date", "desc");
+  const [pg, setPg] = useState(1);
+  useEffect(() => setPg(1), [search, filters]);
+  const pageRows = sortedRows.slice((pg - 1) * PAGE_SIZE, pg * PAGE_SIZE);
 
   return (
     <div>
@@ -4662,7 +4715,7 @@ function ReceiptList({ onNew, onEdit }) {
                 </tr>
               </thead>
               <tbody>
-                {sortedRows.map(r => {
+                {pageRows.map(r => {
                   const rt = RECEIPT_TYPES[r.doc_type] || RECEIPT_TYPES.receipt;
                   return (
                     <tr key={r.id} onMouseEnter={e => e.currentTarget.style.background = "#f8f9fa"} onMouseLeave={e => e.currentTarget.style.background = ""}>
@@ -4708,6 +4761,7 @@ function ReceiptList({ onNew, onEdit }) {
               </tbody>
             </table>
           )}
+        <Pagination total={sortedRows.length} page={pg} onChange={setPg} />
       </div>
     </div>
   );
@@ -6944,7 +6998,16 @@ export default function App() {
         </div>
         <div style={{ padding: "16px 20px", borderTop: "1px solid rgba(255,255,255,0.1)" }}>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userEmail}</div>
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", marginBottom: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userName}</div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.9)", fontWeight: 600, marginBottom: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userName}</div>
+          <div style={{ marginBottom: 10 }}>
+            <span style={{
+              fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 10,
+              background: ROLES[role]?.bg || "#e5e7eb",
+              color: ROLES[role]?.color || "#374151",
+            }}>
+              {ROLES[role]?.label || role}
+            </span>
+          </div>
           <button onClick={handleLogout} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 12, color: "rgba(255,255,255,0.7)", cursor: "pointer", width: "100%" }}>
             ออกจากระบบ
           </button>
