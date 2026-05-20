@@ -1,5 +1,5 @@
 // Netlify serverless function — proxies AI chat requests to Google Gemini API
-// ใช้ gemini-2.0-flash ซึ่งมี Free Tier (ไม่เสียเงิน)
+// ใช้ gemini-pro ซึ่งมี Free Tier (ไม่เสียเงิน)
 // ตั้งค่าใน Netlify → Site → Environment variables:
 //   GEMINI_API_KEY = AIza... (จาก https://aistudio.google.com/app/apikey)
 
@@ -48,7 +48,7 @@ exports.handler = async (event) => {
   };
 
   try {
-    const model = "gemini-1.5-flash-latest";
+    const model = "gemini-pro";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const res = await fetch(url, {
