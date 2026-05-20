@@ -405,27 +405,40 @@ function UserManagementPage({ currentProfile }) {
     if (!form.full_name) { setError("กรุณากรอกชื่อ"); return; }
     if (!form.role) { setError("กรุณาเลือก Role"); return; }
     setSaving(true); setError("");
-    // เรียกผ่าน Netlify function เพราะต้องใช้ SUPABASE_SERVICE_ROLE_KEY (admin key)
-    // ไม่สามารถเรียก Supabase /auth/v1/invite จาก frontend ได้โดยตรง
-    const res = await fetch("/api/invite", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: form.email,
-        full_name: form.full_name,
-        role: form.role,
-        position: form.position || "",
-      }),
-    });
-    const d = await res.json();
-    setSaving(false);
-    if (res.ok && d.success) {
-      setModal(null);
-      setSavedMsg(`ส่งคำเชิญไปที่ ${form.email} แล้ว ✓`);
-      setTimeout(() => setSavedMsg(""), 4000);
-      load();
-    } else {
-      setError(d.error || "ส่งคำเชิญไม่สำเร็จ");
+    // ใช้ AbortController เพื่อ timeout 20 วินาที — ป้องกัน UI ค้าง
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const res = await fetch("/api/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: form.email,
+          full_name: form.full_name,
+          role: form.role,
+          position: form.position || "",
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      const d = await res.json();
+      if (res.ok && d.success) {
+        setModal(null);
+        setSavedMsg(`ส่งคำเชิญไปที่ ${form.email} แล้ว ✓`);
+        setTimeout(() => setSavedMsg(""), 4000);
+        load();
+      } else {
+        setError(d.error || "ส่งคำเชิญไม่สำเร็จ");
+      }
+    } catch (err) {
+      clearTimeout(timer);
+      if (err.name === "AbortError") {
+        setError("หมดเวลา (20 วินาที) — Netlify function ไม่ตอบกลับ ตรวจสอบ Environment Variables ใน Netlify Dashboard");
+      } else {
+        setError("เชื่อมต่อไม่ได้: " + (err.message || "กรุณาลองใหม่"));
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
