@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 const SUPABASE_URL = "https://byprrxqoxxomoffweftu.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5cHJyeHFveHhvbW9mZndlZnR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1NjAzNzksImV4cCI6MjA5NDEzNjM3OX0.D0k3R0VOJzMECsKfvBzXVFXnNBBaNfNCiOHrsZp5uHM";
 
+
 // ─── SUPABASE CLIENT ──────────────────────────────────────────────────────────
 const sb = (() => {
   const base = (token) => ({
@@ -6701,6 +6702,88 @@ const NAV = [
   { key: "users", icon: "👤", label: "จัดการผู้ใช้" },
 ];
 
+// ─── SET PASSWORD PAGE (invite / password reset callback) ─────────────────────
+function SetPasswordPage({ accessToken, type, onDone }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const isInvite = type === "invite";
+
+  const handleSubmit = async () => {
+    if (!password) return setError("กรุณากรอกรหัสผ่าน");
+    if (password.length < 6) return setError("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
+    if (password !== confirm) return setError("รหัสผ่านไม่ตรงกัน");
+    setLoading(true); setError("");
+    try {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.msg || data.message || "เกิดข้อผิดพลาด กรุณาลองใหม่"); setLoading(false); return; }
+      setSuccess(true);
+      setLoading(false);
+      setTimeout(onDone, 2000);
+    } catch {
+      setError("เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่");
+      setLoading(false);
+    }
+  };
+
+  const inputStyle = { width: "100%", padding: "10px 14px", fontSize: 14, border: "1.5px solid #dee2e6", borderRadius: 10, background: "#fff", color: "#1a1a1a", outline: "none", boxSizing: "border-box" };
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8f9fa", fontFamily: "system-ui, sans-serif" }}>
+      <div style={{ width: "100%", maxWidth: 400, padding: "0 20px" }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>🔐</div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a", margin: "0 0 6px" }}>
+            {isInvite ? "ตั้งรหัสผ่านของคุณ" : "รีเซ็ตรหัสผ่าน"}
+          </h1>
+          <p style={{ fontSize: 13, color: "#6c757d", margin: 0 }}>
+            {isInvite ? "ยินดีต้อนรับ! กรุณาตั้งรหัสผ่านเพื่อเริ่มใช้งาน" : "กรุณากรอกรหัสผ่านใหม่ของคุณ"}
+          </p>
+        </div>
+        <div style={{ background: "#fff", borderRadius: 16, padding: "28px 32px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
+          {success ? (
+            <div style={{ textAlign: "center", padding: "20px 0" }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "#065f46", marginBottom: 6 }}>ตั้งรหัสผ่านเรียบร้อยแล้ว</div>
+              <div style={{ fontSize: 13, color: "#6c757d" }}>กำลังนำท่านไปยังหน้าเข้าสู่ระบบ...</div>
+            </div>
+          ) : (
+            <>
+              {error && <div style={{ background: "#fff5f5", border: "1px solid #fed7d7", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#c53030" }}>{error}</div>}
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 12, fontWeight: 500, color: "#495057", display: "block", marginBottom: 6 }}>รหัสผ่านใหม่</label>
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="อย่างน้อย 6 ตัวอักษร" style={inputStyle} disabled={loading} autoFocus onKeyDown={e => e.key === "Enter" && handleSubmit()} />
+              </div>
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ fontSize: 12, fontWeight: 500, color: "#495057", display: "block", marginBottom: 6 }}>ยืนยันรหัสผ่าน</label>
+                <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="กรอกรหัสผ่านอีกครั้ง" style={inputStyle} disabled={loading} onKeyDown={e => e.key === "Enter" && handleSubmit()} />
+              </div>
+              <button onClick={handleSubmit} disabled={loading || !password || !confirm}
+                style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", fontSize: 14, fontWeight: 600,
+                  background: loading || !password || !confirm ? "#dee2e6" : "#065f46",
+                  color: loading || !password || !confirm ? "#adb5bd" : "#fff",
+                  cursor: loading || !password || !confirm ? "not-allowed" : "pointer" }}>
+                {loading ? "กำลังบันทึก..." : isInvite ? "✓ เริ่มใช้งานระบบ" : "✓ รีเซ็ตรหัสผ่าน"}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [session, setSession] = useState(() => sb.auth.getSession());
@@ -6709,6 +6792,42 @@ export default function App() {
   const [quotationRefreshKey, setQuotationRefreshKey] = useState(0);
   const [invoiceDoc, setInvoiceDoc] = useState(null);
   const [receiptDoc, setReceiptDoc] = useState(null);
+
+  // Auth callback — invite / password reset link clicked from email
+  const [authCallback, setAuthCallback] = useState(null); // { type, accessToken }
+
+  useEffect(() => {
+    // Supabase old format: #access_token=...&type=invite (or recovery)
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const hashType = hashParams.get("type");
+    const hashToken = hashParams.get("access_token");
+
+    // Supabase new PKCE format: ?token_hash=...&type=invite (or recovery)
+    const queryParams = new URLSearchParams(window.location.search);
+    const queryType = queryParams.get("type");
+    const queryTokenHash = queryParams.get("token_hash");
+
+    if ((hashType === "invite" || hashType === "recovery") && hashToken) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      setAuthCallback({ type: hashType, accessToken: hashToken });
+    } else if ((queryType === "invite" || queryType === "recovery") && queryTokenHash) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // PKCE: ต้อง verify token_hash ก่อนเพื่อแลก access_token
+      (async () => {
+        try {
+          const res = await fetch(`${SUPABASE_URL}/auth/v1/verify`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
+            body: JSON.stringify({ token_hash: queryTokenHash, type: queryType }),
+          });
+          const data = await res.json();
+          if (res.ok && data.access_token) {
+            setAuthCallback({ type: queryType, accessToken: data.access_token });
+          }
+        } catch { /* silent */ }
+      })();
+    }
+  }, []);
 
   const handleLogin = (data) => setSession(data);
   const handleLogout = useCallback(() => { sb.auth.signOut(); setSession(null); }, []);
@@ -6741,6 +6860,17 @@ export default function App() {
   useEffect(() => {
     return onPermissionsChange(() => forceUpdate(n => n + 1));
   }, []);
+
+  // ── Conditional renders (after all hooks) ──────────────────────────────────
+  if (authCallback) {
+    return (
+      <SetPasswordPage
+        accessToken={authCallback.accessToken}
+        type={authCallback.type}
+        onDone={() => setAuthCallback(null)}
+      />
+    );
+  }
 
   if (!session) return <AuthPage onLogin={handleLogin} />;
   if (profileLoading) return (
