@@ -52,7 +52,7 @@ const geminiBody = {
 };
 
   try {
-   const model = "gemini-1.0-pro";
+   const model = "gemini-2.0-flash";
     const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`;
     const res = await fetch(url, {
       method: "POST",
