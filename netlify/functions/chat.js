@@ -31,21 +31,25 @@ exports.handler = async (event) => {
   // แปลง Anthropic format → Gemini format
   // Anthropic: role "assistant" → Gemini: role "model"
   // Anthropic: content เป็น string → Gemini: parts: [{ text }]
-  const geminiContents = messages.map(m => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content || "" }],
-  }));
+const geminiContents = messages.map(m => ({
+  role: m.role === "assistant" ? "model" : "user",
+  parts: [{ text: m.content || "" }],
+}));
 
-  const geminiBody = {
-    system_instruction: system
-      ? { parts: [{ text: system }] }
-      : { parts: [{ text: "คุณคือ AI Assistant สำหรับระบบบริหารธุรกิจ ตอบเป็นภาษาไทยเสมอ กระชับและตรงประเด็น" }] },
-    contents: geminiContents,
-    generationConfig: {
-      maxOutputTokens: max_tokens || 1000,
-      temperature: 0.7,
-    },
-  };
+const systemText = system || "คุณคือ AI Assistant สำหรับระบบบริหารธุรกิจ ตอบเป็นภาษาไทยเสมอ กระชับและตรงประเด็น";
+const contentsWithSystem = [
+  { role: "user",  parts: [{ text: `[System]: ${systemText}` }] },
+  { role: "model", parts: [{ text: "เข้าใจแล้ว พร้อมช่วยเหลือครับ" }] },
+  ...geminiContents,
+];
+
+const geminiBody = {
+  contents: contentsWithSystem,
+  generationConfig: {
+    maxOutputTokens: max_tokens || 1000,
+    temperature: 0.7,
+  },
+};
 
   try {
    const model = "gemini-1.5-flash";
